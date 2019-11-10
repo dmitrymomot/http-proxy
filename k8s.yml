@@ -1,0 +1,60 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: http-proxy
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  name: http-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-proxy
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 50%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        config.linkerd.io/skip-outbound-ports: "4222,5432,6379"
+        linkerd.io/inject: enabled
+      creationTimestamp: null
+      labels:
+        app: http-proxy
+    spec:
+      serviceAccountName: http-proxy
+      containers:
+        - name: http-proxy
+          image: http-proxy:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            [
+              "-port=8080",
+              "-forward_port=8888",
+              "-debug=true",
+              "-console_log=true",
+            ]
+          ports:
+            - containerPort: 8080
+              name: http-proxy
+status: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-proxy
+spec:
+  type: LoadBalancer
+  selector:
+    app: http-proxy
+  ports:
+    - name: http-proxy-lb
+      port: 8080
+      targetPort: 8080
